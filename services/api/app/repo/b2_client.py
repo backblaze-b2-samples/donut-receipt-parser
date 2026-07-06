@@ -28,9 +28,9 @@ def _split_key(key: str) -> tuple[str, str]:
 
 def _public_url(key: str) -> str | None:
     """Build a public URL for an object key, percent-encoding the path."""
-    if not settings.b2_public_url:
+    if not settings.b2_public_url_base:
         return None
-    return f"{settings.b2_public_url}/{quote(key, safe='/')}"
+    return f"{settings.b2_public_url_base}/{quote(key, safe='/')}"
 
 
 @functools.lru_cache(maxsize=1)
@@ -38,11 +38,11 @@ def get_s3_client():
     return boto3.client(
         "s3",
         endpoint_url=settings.b2_endpoint,
-        aws_access_key_id=settings.b2_key_id,
+        aws_access_key_id=settings.b2_application_key_id,
         aws_secret_access_key=settings.b2_application_key,
         config=Config(
             signature_version="s3v4",
-            user_agent_extra="b2ai-oss-start",
+            user_agent_extra="b2ai-donut-receipt-parser",
         ),
     )
 
@@ -112,6 +112,48 @@ def list_files(prefix: str = "", max_keys: int = 1000) -> list[FileMetadata]:
         )
     files.sort(key=lambda f: f.uploaded_at, reverse=True)
     return files
+
+
+def get_object_bytes(key: str) -> bytes:
+    """Fetch an object's raw bytes from B2. Raises RuntimeError on failure."""
+    client = get_s3_client()
+    try:
+        response = client.get_object(Bucket=settings.b2_bucket_name, Key=key)
+        return response["Body"].read()
+    except ClientError as e:
+        raise RuntimeError(f"B2 get failed for '{key}': {e}") from e
+
+
+def put_object_bytes(
+    data: bytes, key: str, content_type: str, metadata: dict | None = None
+) -> None:
+    """Write raw bytes to B2 at ``key``. Raises RuntimeError on failure."""
+    client = get_s3_client()
+    kwargs: dict = {
+        "Bucket": settings.b2_bucket_name,
+        "Key": key,
+        "Body": io.BytesIO(data),
+        "ContentType": content_type,
+    }
+    if metadata:
+        kwargs["Metadata"] = metadata
+    try:
+        client.put_object(**kwargs)
+    except ClientError as e:
+        raise RuntimeError(f"B2 put failed for '{key}': {e}") from e
+
+
+def object_exists(key: str) -> bool:
+    """Return True if an object exists at ``key`` in the bucket."""
+    client = get_s3_client()
+    try:
+        client.head_object(Bucket=settings.b2_bucket_name, Key=key)
+        return True
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("404", "NoSuchKey", "NotFound"):
+            return False
+        raise
 
 
 def get_file_metadata(key: str) -> FileMetadata | None:

@@ -2,11 +2,14 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    b2_endpoint: str = "https://s3.us-west-004.backblazeb2.com"
-    b2_key_id: str = ""
+    # Standardized B2_* names. The S3 endpoint is derived from the region
+    # (https://s3.<region>.backblazeb2.com) so no endpoint URL is hardcoded
+    # anywhere and no per-region string leaks into source.
+    b2_application_key_id: str = ""
     b2_application_key: str = ""
     b2_bucket_name: str = ""
-    b2_public_url: str = ""
+    b2_region: str = ""
+    b2_public_url_base: str = ""
 
     api_port: int = 8000
     # Explicit allowlist by default — covers Next on :3000 and the
@@ -27,6 +30,15 @@ class Settings(BaseSettings):
     download_count_file: str = "data/download_count.json"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @property
+    def b2_endpoint(self) -> str:
+        """Derive the S3-compatible endpoint from the configured region.
+
+        Keeping this derived means the region is the single knob and no
+        region-specific endpoint string is hardcoded in source.
+        """
+        return f"https://s3.{self.b2_region}.backblazeb2.com"
 
     @property
     def cors_origins(self) -> list[str]:

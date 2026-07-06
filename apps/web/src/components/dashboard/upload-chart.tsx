@@ -20,11 +20,11 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useUploadActivity } from "@/lib/queries";
+import { useIngestActivity } from "@/lib/queries";
 
 const chartConfig = {
   uploads: {
-    label: "Uploads",
+    label: "Documents",
     color: "var(--chart-1)",
   },
 } satisfies ChartConfig;
@@ -51,8 +51,8 @@ function UploadChartSkeleton() {
   );
 }
 
-export function UploadChart() {
-  const { data: activity, isLoading, error, refetch } = useUploadActivity(7);
+export function IngestChart() {
+  const { data: activity, isLoading, error, refetch } = useIngestActivity(7);
 
   // Memoize so recharts doesn't re-render on identical fetches.
   const data = useMemo(
@@ -73,8 +73,8 @@ export function UploadChart() {
   return (
     <Card>
       <CardHeader className="border-b border-border py-4 px-5">
-        <CardTitle className="card-title">Upload Activity</CardTitle>
-        <CardDescription className="text-xs">Last 7 days</CardDescription>
+        <CardTitle className="card-title">Ingest Activity</CardTitle>
+        <CardDescription className="text-xs">Documents added · last 7 days</CardDescription>
         <CardAction className="text-right self-center">
           {isLoading ? (
             <div aria-hidden className="space-y-1">
@@ -102,7 +102,7 @@ export function UploadChart() {
           <EmptyState
             icon={BarChart3}
             title="No activity yet"
-            description="Upload files to see activity trends here."
+            description="Add documents to see ingest trends here."
           />
         ) : (
           <ChartContainer config={chartConfig} className="h-[240px] w-full">

@@ -1,0 +1,11 @@
+# Heavy ML stack for the Donut extraction feature — kept separate from the
+# fast-installing core requirements.txt. Install alongside it:
+#   pip install -r requirements.txt -r requirements-ml.txt
+# First parse downloads ~0.8 GB of weights once from the public HF hub (keyless),
+# then caches them. Imports are lazy (repo/donut_model.py) so the app boots and
+# the non-parse test suite runs without this stack installed.
+transformers>=4.40,<4.46
+torch>=2.2,<2.5
+sentencepiece>=0.2.0     # Donut's XLMRoberta tokenizer needs it
+protobuf>=4.25,<6        # tokenizer conversion
+# Pillow is already pinned in requirements.txt.

@@ -1,130 +1,104 @@
-<!-- last_verified: 2026-05-01 -->
-# Vibe Coding Starter Kit
+<!-- last_verified: 2026-07-06 -->
+# Donut Receipt Parser
 
-Stop wiring boilerplate and start building. This open-source starter kit gives vibe coders and AI coding agents a production-ready foundation — a full-stack TypeScript + Python template with a pre-built dashboard UI, file upload system, and **[Backblaze B2](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start)** cloud storage already integrated. Save thousands of tokens on setup prompts, skip the "build me a dashboard from scratch" loop, and go straight to building your app's unique features.
+Pull structured data — line items, subtotal, tax, total — out of receipt and
+invoice **images** with **no OCR preprocessing step**, and keep every raw
+document and every extraction as an auditable trail in
+**[Backblaze B2](https://www.backblaze.com/cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-donut-receipt-parser)**.
+
+This sample runs [Donut](https://github.com/clovaai/donut)
+(`naver-clova-ix/donut-base-finetuned-cord-v2`) **locally** to read each document
+image end-to-end and emit JSON directly — no Tesseract, no cloud OCR, no second
+API key. B2 is the single store for both the raw uploaded images
+(`raw-documents/`) and the derived structured-data artifacts
+(`extracted/<year>/<month>/<doc-id>.json` plus per-run JSONL manifests), all via
+the S3-compatible API. It's built for accounting teams, expense platforms, and
+logistics operators that want a continuous **ingest → parse → store → serve**
+loop where bulk write volume accumulates in B2 as it scales.
 
 **What you get out of the box:**
-- Full-stack dashboard UI (Next.js 16 + React 19 + Tailwind v4 + shadcn/ui)
-- File upload with drag-and-drop, progress tracking, and metadata extraction
-- File browser with preview, download, and delete
+- OCR-free document extraction with Donut, running on-device (CPU / Apple MPS / CUDA autodetected)
+- A scoped Documents library with the full create → parse → review → delete lifecycle
+- Human-in-the-loop correction for the fields the model can't infer (merchant, date)
+- A pipeline dashboard (documents ingested, parsed, coverage %, recent extractions)
+- The reusable B2 scaffolding from the starter kit: full-bucket file explorer + generic upload
 - FastAPI backend with strict layered architecture and structural tests
 - Agent-optimized docs — your AI coding agent can read the repo and start contributing immediately
 
-## What it looks like
+## Why B2
 
-**Dashboard** — stats, upload activity, and recent uploads at a glance:
+Every artifact in the pipeline lives in one bucket over the S3-compatible API:
+the raw image you upload, the normalized JSON Donut produces, and a JSONL
+manifest per parse run for incremental downstream processing. There is **no
+database** — a document's `doc_id` is a deterministic hash of its raw object key,
+so `raw-documents/` and `extracted/` correlate directly in B2. As you parse more
+documents the extraction corpus grows as durable, queryable object storage.
 
-![Dashboard view showing stat cards, upload activity chart, and recent uploads table](docs/images/b2-starterkit-dashboard1.png)
-
-**File browser** — tree view with preview, download, and delete:
-
-![File browser view showing a tree of files with hover actions](docs/images/b2-starterkit-fileview2.png)
-
-## Agent-First Architecture
-
-This repo is optimized for coding agents. Use the template, point your agent at it, and start building.
-
-The structure follows the principle that **repository knowledge is the system of record**. Anything an agent can't access in-context doesn't exist — so everything it needs to reason about the codebase is versioned, co-located, and discoverable from the repo itself.
-
-### How it works
-
-**[AGENTS.md](AGENTS.md) is the single source of truth for all coding agents.** A ~100 line entry point gives agents the repository layout, architectural invariants, commands, conventions, and pointers to deeper docs. Agent-specific files (CLAUDE.md, etc.) are thin pointers back to AGENTS.md.
-
-**Architecture is enforced mechanically, not by convention.** Layering rules, import boundaries, file size limits, and SDK containment are verified by structural tests and lints that run on every change. When rules are enforceable by code, agents follow them reliably.
-
-**The knowledge base is structured for progressive disclosure:**
+## Storage layout
 
 ```
-AGENTS.md              Single source of truth — layout, invariants, commands, conventions
-ARCHITECTURE.md        System layout, layering rules, data flows
-docs/
-  features/            Feature docs (inputs, outputs, flows, edge cases)
-  app-workflows.md     User journeys
-  dev-workflows.md     Engineering workflows and testing
-  SECURITY.md          Security principles
-  RELIABILITY.md       Reliability expectations
-  exec-plans/          Execution plans and tech debt tracker
+raw-documents/<submitter>/<type>/<timestamp>-<filename>   # uploaded images (create)
+extracted/<year>/<month>/<doc-id>.json                    # normalized + raw extraction (run/edit)
+manifests/<run-id>.jsonl                                   # one JSONL object per parse run
 ```
 
-### Key design decisions
+## Architecture at a glance
 
-| Principle | Implementation |
-|-----------|---------------|
-| Give agents a single source of truth | AGENTS.md ~100 lines — layout, invariants, commands, conventions |
-| Enforce invariants mechanically | Structural tests + ruff + ESLint verify boundaries |
-| DRY documentation | Each fact lives in one place; no redundant files to drift |
-| Strict layered architecture | `types -> config -> repo -> service -> runtime`, enforced by tests |
-| Prefer boring, composable libraries | stdlib logging over frameworks, Pydantic over ad-hoc validation |
-| Contain external SDKs | `boto3` only in `repo/` layer — verified by structural test |
-| Keep files agent-sized | 300-line limit per file, enforced by test |
-| Docs updated with code | Same-PR requirement prevents documentation rot |
-| Structured observability | JSON logging, `/metrics` endpoint, request tracing |
-
-This approach draws from [OpenAI's experience building with Codex](https://openai.com/index/harness-engineering/): agents work best in environments with strict boundaries, predictable structure, and progressive context disclosure.
+The Donut model is contained in the repo layer (`services/api/app/repo/donut_model.py`),
+mirroring how `boto3` is contained in `repo/b2_client.py` — the `service/` and
+`runtime/` layers never import `transformers` or `torch` directly. See
+[ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Quick Start
 
-You need: Node.js >= 20, pnpm >= 9, Python >= 3.11, and a free **[Backblaze B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start)**.
-
-### Start a new project
-
-**Option 1: GitHub Template (recommended)**
-
-Click the green **"Use this template"** button at the top of this repo, name your project, then:
-
-```bash
-git clone https://github.com/yourorg/my-cool-app.git
-cd my-cool-app
-```
-
-**Option 2: Clone and reinitialize**
-
-```bash
-git clone https://github.com/backblaze-b2-samples/vibe-coding-starter-kit.git my-cool-app
-cd my-cool-app
-rm -rf .git
-git init
-git add .
-git commit -m "Initial commit from vibe-coding-starter-kit"
-```
-
-Either way you get a clean project with no upstream history — ready to push to your own repo and point your agent at it.
+You need: Node.js >= 20, pnpm >= 9, Python >= 3.11, and a free
+**[Backblaze B2 account](https://www.backblaze.com/cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-donut-receipt-parser)**.
+No second API key — the Donut weights download once from the public Hugging Face
+hub (keyless) and cache locally.
 
 ### Setup
 
-**1. Install dependencies**
+**1. Install frontend dependencies**
 
 ```bash
 pnpm install
 ```
 
-**2. Set up the backend**
+**2. Set up the backend (core + the Donut ML stack)**
 
 ```bash
 cd services/api
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-ml.txt
 cd ../..
 ```
 
-**3. Add your B2 credentials**
+The heavy Donut stack (torch + transformers) lives in `requirements-ml.txt`,
+separate from the fast-installing `requirements.txt`. The first parse downloads
+~0.8 GB of weights once, then reuses the cache. Model imports are lazy, so the
+app boots and the test suite runs without the ML stack installed.
 
-Set up your local `.env`:
+**Device selection is automatic:** the model runs on the first available of
+CUDA → Apple MPS → CPU, defaulting to CPU. On MPS, if Donut's `generate` hits an
+unsupported op it falls back to CPU for that call. CPU inference of one receipt
+takes ~10–30 s but always completes.
+
+**3. Add your B2 credentials**
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` in your editor and keep it visible. Then head to the [Backblaze B2 dashboard](https://secure.backblaze.com/b2_buckets.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start) and:
+Open `.env` and, from the [Backblaze B2 dashboard](https://secure.backblaze.com/b2_buckets.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-donut-receipt-parser):
 
-1. **Create a bucket.** B2 will show two values — paste each into `.env`:
-   - **Bucket Unique Name** → `B2_BUCKET_NAME`
-   - **Endpoint** → `B2_ENDPOINT`
-2. **Create an application key** with `Read and Write` permission. B2 will show two values — paste each into `.env`:
-   - **keyID** → `B2_KEY_ID`
-   - **applicationKey** → `B2_APPLICATION_KEY` *(only shown once — paste it now)*
+1. **Create a bucket** and set `B2_BUCKET_NAME` and `B2_REGION` (e.g. `us-west-004`).
+   The S3 endpoint is derived from the region — no endpoint URL to paste.
+2. **Create an application key** with `Read and Write` permission and set
+   `B2_APPLICATION_KEY_ID` (keyID) and `B2_APPLICATION_KEY` (applicationKey,
+   shown only once).
+3. Optionally set `B2_PUBLIC_URL_BASE` if the bucket is public.
 
-> Want a walkthrough? See the docs for [creating a bucket](https://www.backblaze.com/docs/cloud-storage-create-and-manage-buckets) and [creating app keys](https://www.backblaze.com/docs/cloud-storage-create-and-manage-app-keys).
+> Walkthroughs: [creating a bucket](https://www.backblaze.com/docs/cloud-storage-create-and-manage-buckets?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-donut-receipt-parser) · [creating app keys](https://www.backblaze.com/docs/cloud-storage-create-and-manage-app-keys?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-donut-receipt-parser).
 
 **4. Run it**
 
@@ -132,41 +106,37 @@ Open `.env` in your editor and keep it visible. Then head to the [Backblaze B2 d
 pnpm dev
 ```
 
-That's it. Frontend at `localhost:3000`, API at `localhost:8000`. Upload a file and see it working.
+Frontend at `localhost:3000`, API at `localhost:8000`. Go to **Documents**, add a
+receipt image, and click **Parse**.
 
-`pnpm dev` runs `pnpm doctor` first — a preflight check that catches the common setup gotchas (wrong Node/Python version, missing venv, missing or placeholder `.env`, ports already taken) and tells you exactly how to fix each one. Run it standalone any time with `pnpm doctor`.
+## Using it
 
-## Building Your App
-
-When you adapt this kit for a new app, keep the shared scaffolding and only swap out what's app-specific:
-
-- **Keep** the UI kit (`apps/web/src/components/ui/` + design tokens in `globals.css` + `/design`).
-- **Keep** the File Explorer (`/files`) and Upload (`/upload`) pages and their sidebar nav entries — they're the reusable B2-backed surface.
-- **Adapt** the Dashboard (`/`) to your use case — replace the default stats, chart, and recent uploads with metrics that reflect what your app actually does.
-- **Rebrand** by editing a single file: `apps/web/src/lib/app-config.ts` holds the app name and description (`APP_NAME`, `APP_DESCRIPTION`). Changing them there updates the page title, sidebar, and breadcrumb everywhere — no other files to touch.
-
-Full contract and rationale: [AGENTS.md §2 — Building on This Starter Kit](AGENTS.md#2-building-on-this-starter-kit).
+1. **Add a document** — on `/documents`, drop a receipt/invoice image, set the
+   submitter ID and type (receipt/invoice). It's stored under `raw-documents/`.
+2. **Parse** — click Parse on the detail page (or "Parse all unparsed" on the
+   list). Donut reads the image and writes `extracted/…json` + a run manifest.
+3. **Review & correct** — Donut's CORD model reliably reads line items and
+   totals but not the merchant or date; fill those in via "Correct fields". The
+   corrected JSON is written back to B2.
+4. **Serve** — every extraction is a JSON object in B2 for downstream tools.
 
 ## Core Features
 
-- [File Upload](docs/features/file-upload.md) — drag-and-drop upload with real-time progress
-- [File Browser](docs/features/file-browser.md) — list, preview, download, delete files
-- [Dashboard](docs/features/dashboard.md) — stats cards, upload chart, recent uploads
-- [Metadata Extraction](docs/features/metadata-extraction.md) — image dimensions, EXIF, PDF info, checksums
-- [Design System](docs/design-system.md) — tokens, primitives, AI elements, the blaze generating loader, and inline `ErrorState` / `EmptyState` patterns. Live preview at `/design`.
-- Inline error handling — fetch failures surface *what's wrong* (API offline, 401, 5xx) and offer a Retry, instead of silently rendering empty state.
-- Single-source config — one `.env` at the repo root powers both API and web app, validated at startup so misconfig fails fast with a readable message.
-- Centralized data layer — every fetch goes through TanStack Query hooks in `apps/web/src/lib/queries.ts`; cache invalidation is one call after a mutation.
-- Structural tests — verify layering rules, import boundaries, SDK containment, file size limits
-- Structured JSON logging — every request traced with `request_id` and timing
-- `/health` endpoint — B2 connectivity check
-- `/metrics` endpoint — Prometheus-format counters (request count, latency, uploads)
+- [Document Ingest](docs/features/document-ingest.md) — upload receipt/invoice images to B2
+- [Donut Extraction](docs/features/donut-extraction.md) — OCR-free structured-data extraction (the marquee feature)
+- [Document Review](docs/features/document-review.md) — human-in-the-loop correction + the structured-data store
+- [Dashboard](docs/features/dashboard.md) — pipeline metrics and recent extractions
+- [File Upload](docs/features/file-upload.md) — generic drag-and-drop upload (kept from starter)
+- [File Browser](docs/features/file-browser.md) — full-bucket explorer (kept from starter)
+- [Metadata Extraction](docs/features/metadata-extraction.md) — image/PDF metadata for uploads
+- [Design System](docs/design-system.md) — tokens, primitives, error/empty states. Live preview at `/design`.
 
 ## Tech Stack
 
 - TypeScript, Next.js 16, React 19, Tailwind v4, shadcn/ui, Recharts
-- TanStack Query — caching, dedup, retry, stale-while-revalidate for every fetch
-- Python 3.11+, FastAPI, boto3, Pydantic v2, Pillow, PyPDF2
+- TanStack Query — caching, dedup, retry for every fetch
+- Python 3.11+, FastAPI, boto3, Pydantic v2, Pillow
+- **Donut** (`transformers` + `torch`) — OCR-free document understanding, on-device
 - Backblaze B2 (S3-compatible object storage)
 - pnpm workspaces (monorepo)
 
@@ -180,9 +150,15 @@ Full contract and rationale: [AGENTS.md §2 — Building on This Starter Kit](AG
 | `pnpm build` | Build frontend |
 | `pnpm lint` | Lint frontend |
 | `pnpm lint:api` | Lint backend (ruff) |
-| `pnpm test:api` | Run backend tests |
+| `pnpm test:api` | Run backend tests (Donut monkeypatched — no torch/model needed) |
 | `pnpm check:structure` | Verify layering rules |
-| `pnpm test:e2e` | Playwright e2e tests (run `pnpm --filter @vibe-coding-starter-kit/web exec playwright install chromium` once first) |
+| `pnpm test:e2e` | Playwright e2e tests (run `pnpm --filter @donut-receipt-parser/web exec playwright install chromium` once first) |
+
+Verify the real model end-to-end (downloads weights):
+
+```bash
+cd services/api && RUN_DONUT_REAL=1 .venv/bin/python -m pytest tests/test_donut_real.py -v -s
+```
 
 ## Documentation Map
 
@@ -190,17 +166,11 @@ Full contract and rationale: [AGENTS.md §2 — Building on This Starter Kit](AG
 |-----|---------|
 | [AGENTS.md](AGENTS.md) | Agent table of contents — start here |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System layout, layering, data flows |
-| [docs/features/](docs/features/) | Feature docs (upload, browser, dashboard, metadata) |
-| [docs/design-system.md](docs/design-system.md) | Design tokens, primitives, AI elements, loader, error/empty states |
+| [docs/features/](docs/features/) | Feature docs |
 | [docs/app-workflows.md](docs/app-workflows.md) | User journeys |
 | [docs/dev-workflows.md](docs/dev-workflows.md) | Engineering workflows and testing |
 | [docs/SECURITY.md](docs/SECURITY.md) | Security principles |
 | [docs/RELIABILITY.md](docs/RELIABILITY.md) | Reliability expectations |
-| [docs/exec-plans/](docs/exec-plans/) | Execution plans and tech debt tracker |
-
-## Contributing
-
-Start with [AGENTS.md](AGENTS.md). It's the map — everything else is discoverable from there.
 
 ## License
 

@@ -26,6 +26,7 @@ import { APP_NAME } from "@/lib/app-config";
 // (e.g. "/" -> "Dashboard", "/design" -> "Design System").
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
+  "/documents": "Documents",
   "/upload": "Upload",
   "/files": "Files",
   "/settings": "Settings",
@@ -46,7 +47,11 @@ function deriveTitleFromPath(pathname: string): string {
 export function Header() {
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
-  const pageTitle = pageTitles[pathname] ?? deriveTitleFromPath(pathname);
+  // Dynamic document detail route (/documents/<doc-id>) — render a stable
+  // label instead of the opaque doc-id hash segment.
+  const pageTitle = pathname.startsWith("/documents/")
+    ? "Document"
+    : (pageTitles[pathname] ?? deriveTitleFromPath(pathname));
   const [paletteOpen, setPaletteOpen] = useState(false);
   const nextTheme = resolvedTheme === "dark" ? "light" : "dark";
 

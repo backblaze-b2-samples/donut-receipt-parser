@@ -1,9 +1,16 @@
 import type {
+  CorrectionRequest,
   DailyUploadCount,
+  DocumentCreateResponse,
+  DocumentDetail,
+  DocumentSummary,
+  ExtractedData,
   FileMetadata,
   FileUploadResponse,
+  ParseBatchResponse,
+  PipelineStats,
   UploadStats,
-} from "@vibe-coding-starter-kit/shared";
+} from "@donut-receipt-parser/shared";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -208,4 +215,88 @@ export function uploadFile(
     xhr.open("POST", `${API_BASE}/upload`);
     xhr.send(formData);
   });
+}
+
+// --- Documents (Donut receipt/invoice extraction) ---
+
+export async function getDocuments() {
+  return apiFetch<DocumentSummary[]>("/documents");
+}
+
+export async function getDocument(docId: string) {
+  return apiFetch<DocumentDetail>(`/documents/${encodeURIComponent(docId)}`);
+}
+
+export async function getPipelineStats() {
+  return apiFetch<PipelineStats>("/documents/stats");
+}
+
+export async function getIngestActivity(days = 7) {
+  return apiFetch<DailyUploadCount[]>(`/documents/activity?days=${days}`);
+}
+
+export function createDocument(
+  file: File,
+  submitterId: string,
+  documentType: string,
+  onProgress?: (percent: number) => void,
+): Promise<DocumentCreateResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("submitter_id", submitterId);
+    formData.append("document_type", documentType);
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(JSON.parse(xhr.responseText));
+      } else {
+        try {
+          const body = JSON.parse(xhr.responseText);
+          reject(new ApiError(body.detail || `Upload failed: ${xhr.status}`, xhr.status));
+        } catch {
+          reject(new ApiError(`Upload failed: ${xhr.status}`, xhr.status));
+        }
+      }
+    });
+
+    xhr.addEventListener("error", () => reject(networkError()));
+    xhr.addEventListener("abort", () => reject(new ApiError("Upload aborted", 0)));
+
+    xhr.open("POST", `${API_BASE}/documents`);
+    xhr.send(formData);
+  });
+}
+
+export async function parseDocument(docId: string) {
+  return apiFetch<{ doc_id: string; status: string; extracted: ExtractedData }>(
+    `/documents/${encodeURIComponent(docId)}/parse`,
+    { method: "POST" },
+  );
+}
+
+export async function parseBatch() {
+  return apiFetch<ParseBatchResponse>("/documents/parse-batch", { method: "POST" });
+}
+
+export async function correctDocument(docId: string, correction: CorrectionRequest) {
+  return apiFetch<DocumentDetail>(`/documents/${encodeURIComponent(docId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(correction),
+  });
+}
+
+export async function deleteDocument(docId: string) {
+  return apiFetch<{ deleted: boolean; doc_id: string }>(
+    `/documents/${encodeURIComponent(docId)}`,
+    { method: "DELETE" },
+  );
 }

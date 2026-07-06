@@ -1,4 +1,4 @@
-# Code Review: Vibe Coding OSS Starter Kit
+# Code Review: Donut Receipt Parser
 
 **Reviewer:** Claude | **Date:** 2026-02-26
 

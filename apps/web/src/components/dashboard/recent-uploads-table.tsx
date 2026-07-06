@@ -14,36 +14,21 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { useFiles } from "@/lib/queries";
+import { usePipelineStats } from "@/lib/queries";
 import { formatDate } from "@/lib/utils";
+import { formatMoney } from "@/components/documents/document-status";
 
-function mimeToLabel(mime: string) {
-  const map: Record<string, string> = {
-    "image/jpeg": "Image",
-    "image/png": "Image",
-    "image/gif": "Image",
-    "image/webp": "Image",
-    "application/pdf": "PDF",
-    "text/plain": "Text",
-    "text/csv": "CSV",
-    "application/json": "JSON",
-    "application/zip": "Archive",
-    "video/mp4": "Video",
-    "audio/mpeg": "Audio",
-  };
-  return map[mime] || "File";
-}
-
-export function RecentUploadsTable() {
-  const { data: files = [], isLoading, error, refetch } = useFiles("", 10);
+export function RecentExtractionsTable() {
+  const { data: stats, isLoading, error, refetch } = usePipelineStats();
+  const rows = stats?.recent_extractions ?? [];
 
   return (
     <Card>
       <CardHeader className="border-b border-border py-4 px-5">
-        <CardTitle className="card-title">Recent Uploads</CardTitle>
+        <CardTitle className="card-title">Recent Extractions</CardTitle>
         <CardAction className="self-center">
           <Link
-            href="/files"
+            href="/documents"
             className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             View all
@@ -60,53 +45,49 @@ export function RecentUploadsTable() {
           </div>
         ) : error ? (
           <ErrorState error={error} onRetry={() => refetch()} />
-        ) : files.length === 0 ? (
+        ) : rows.length === 0 ? (
           <EmptyState
             icon={Inbox}
-            title="No uploads yet"
-            description="Head to Upload to add your first files."
+            title="No extractions yet"
+            description="Parse a document to see extracted receipts here."
           />
         ) : (
           <Table className="table-fixed">
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead className="w-[34%] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Filename
+                  Merchant
                 </TableHead>
-                <TableHead className="w-[14%] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Size
-                </TableHead>
-                <TableHead className="w-[14%] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-[18%] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Type
                 </TableHead>
-                <TableHead className="w-[22%] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Date
+                <TableHead className="w-[20%] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Total
                 </TableHead>
-                <TableHead className="w-[16%] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Status
+                <TableHead className="w-[28%] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Parsed
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {files.map((file) => (
-                <TableRow key={file.key} className="table-row-hover">
+              {rows.map((row) => (
+                <TableRow key={row.doc_id} className="table-row-hover">
                   <TableCell className="font-medium">
-                    <div className="truncate">{file.filename}</div>
+                    <Link
+                      href={`/documents/${row.doc_id}`}
+                      className="block truncate hover:text-primary hover:underline"
+                    >
+                      {row.merchant || "Unnamed merchant"}
+                    </Link>
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground tabular-nums whitespace-nowrap">
-                    {file.size_human}
+                  <TableCell className="capitalize text-muted-foreground">
+                    {row.document_type}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs tabular-nums whitespace-nowrap">
+                    {formatMoney(row.total, row.currency)}
                   </TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap">
-                    {mimeToLabel(file.content_type)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground whitespace-nowrap">
-                    {formatDate(file.uploaded_at)}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
-                      Complete
-                    </span>
+                    {row.parsed_at ? formatDate(row.parsed_at) : "—"}
                   </TableCell>
                 </TableRow>
               ))}

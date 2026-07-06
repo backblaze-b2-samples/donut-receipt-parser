@@ -1,53 +1,53 @@
-<!-- last_verified: 2026-06-25 -->
+<!-- last_verified: 2026-07-06 -->
 # Feature: Dashboard
 
 ## Purpose
-Provide an at-a-glance overview of file storage usage and recent upload activity.
+Give an at-a-glance overview of the extraction pipeline: how many documents have
+been ingested and parsed, coverage, and the most recent extractions.
 
 ## Used By
 - UI: `/` page (dashboard home)
-- API: `GET /files/stats`, `GET /files`, `GET /files/stats/activity`
+- API: `GET /documents/stats`, `GET /documents/activity`
 
 ## Core Functions
-- `apps/web/src/components/dashboard/stats-cards.tsx` — 4 stat cards
-- `apps/web/src/components/dashboard/recent-uploads-table.tsx` — last 10 uploads
-- `apps/web/src/components/dashboard/upload-chart.tsx` — bar chart of uploads per day
-- `apps/web/src/lib/api-client.ts` — `getFileStats()`, `getFiles()`, `getUploadActivity()`
-- `services/api/app/runtime/files.py` — `GET /files/stats` handler
-- `services/api/app/service/files.py` — `get_stats()` business logic
-- `services/api/app/repo/b2_client.py` — `get_upload_stats()` data access
+- `apps/web/src/components/dashboard/stats-cards.tsx` — 4 pipeline stat cards
+- `apps/web/src/components/dashboard/recent-uploads-table.tsx` — `RecentExtractionsTable` (latest parsed docs)
+- `apps/web/src/components/dashboard/upload-chart.tsx` — `IngestChart` (documents added per day)
+- `apps/web/src/lib/queries.ts` — `usePipelineStats()`, `useIngestActivity()`
+- `services/api/app/runtime/documents.py` — `GET /documents/stats`, `GET /documents/activity`
+- `services/api/app/service/documents.py` — `get_pipeline_stats()`, `get_ingest_activity()`
+- `services/api/app/repo/b2_client.py` — `list_files()` (paginated S3 listing)
 
 ## Canonical Files
-- Dashboard page layout: `apps/web/src/components/dashboard/stats-cards.tsx`
-- Stats service logic: `services/api/app/service/files.py`
+- Stat cards: `apps/web/src/components/dashboard/stats-cards.tsx`
+- Stats service logic: `services/api/app/service/documents.py`
 
 ## Inputs
 - None (dashboard loads data automatically)
 
 ## Outputs
-- `GET /files/stats` → `UploadStats` (total_files, total_size_bytes, total_size_human, uploads_today, total_downloads)
-- `GET /files` (limit 10) → `FileMetadata[]` for recent uploads table (sorted newest-first)
-- `GET /files/stats/activity?days=7` → `DailyUploadCount[]` for chart (server-side aggregation)
+- `GET /documents/stats` → `PipelineStats` (documents_ingested, documents_parsed, documents_unparsed, parse_coverage, recent_extractions)
+- `GET /documents/activity?days=7` → `DailyUploadCount[]` for the ingest chart (server-side aggregation over `raw-documents/`)
 
 ## Flow
-- Page loads → three parallel API calls (stats, recent files, upload activity)
-- Stats cards display total files, storage used, uploads today, total downloads
-- Upload chart displays server-aggregated daily counts for last 7 days as bar chart after activity data is known
-- Recent uploads table shows last 10 files with filename, size, type, date, status badge
+- Page loads → parallel API calls for pipeline stats and ingest activity
+- Stat cards display documents ingested, parsed, parse coverage %, and awaiting parse
+- Ingest chart displays documents added per day for the last 7 days as a bar chart
+- Recent extractions table shows the latest parsed documents (merchant, type, total, parsed-at), each linking to its detail page
 
 ## Edge Cases
-- API unavailable → error states with retry where supported; activity chart does not show a false zero state while loading
-- No files uploaded → empty chart message, empty table message
-- Large file count → stats endpoint paginates through all objects using `ContinuationToken`
+- API unavailable → inline error state with retry; the chart does not show a false zero while loading
+- No documents → empty chart + empty recent-extractions state; coverage renders 0%
+- Large document count → stats paginate through objects via `list_objects_v2`
 
 ## UX States
-- Loading: skeleton placeholders for cards, table, and upload activity chart
-- Empty: "No files uploaded yet" / "No upload data available yet"
+- Loading: skeletons for cards, chart, and table
+- Empty: "No extractions yet" / "No activity yet"
 - Loaded: populated cards, chart, table
 
 ## Verification
-- Test files: `services/api/tests/test_upload_activity.py`, `services/api/tests/test_recent_files.py`
-- Required cases: stats with files, stats with empty bucket, API error fallback
+- Test files: `services/api/tests/test_documents.py` (`test_pipeline_stats`)
+- Required cases: stats with parsed docs, empty bucket, API error fallback
 - Quick verify command: `pnpm test:api`
 - Full verify command: `pnpm lint && pnpm lint:api && pnpm test:api && pnpm check:structure`
 - Pass criteria: all pytest tests green, no ruff violations

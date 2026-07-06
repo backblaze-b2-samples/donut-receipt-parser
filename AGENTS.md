@@ -25,8 +25,11 @@ When this repo is used as the foundation for a new app, the following pieces are
 - The sidebar nav itself (Dashboard, Upload, Files, Settings, plus the Design System utility link).
 
 **Adapt to the new use case**
-- **Dashboard.** `/` route and `apps/web/src/components/dashboard/` (stats cards, upload chart, recent uploads table) are illustrative defaults. Replace them with metrics, charts, and tables that reflect what the new app actually does (e.g. transcripts processed, embeddings indexed, classifications run). New aggregations must flow through the same `runtime -> service -> repo` layering and be exposed via TanStack Query hooks in `apps/web/src/lib/queries.ts` — no bare `useEffect + fetch`.
+- **Dashboard.** `/` route and `apps/web/src/components/dashboard/` (stats cards, chart, table) are illustrative defaults. In this app they are adapted to **pipeline metrics** (documents ingested/parsed, coverage %, ingest activity, recent extractions) — the files are kept, their content reflects the extraction pipeline. New aggregations flow through the same `runtime -> service -> repo` layering and are exposed via TanStack Query hooks in `apps/web/src/lib/queries.ts` — no bare `useEffect + fetch`.
 - Update `docs/features/dashboard.md` in the same PR as any dashboard change (see §9).
+
+**App-specific surface added by this sample (Donut Receipt Parser)**
+- **Documents library.** `/documents` (scoped explorer) and `/documents/[docId]` (detail), backed by `apps/web/src/components/documents/`, are the primary feature — the `Document` entity's create → parse (run) → review (edit) → delete lifecycle. This is distinct from the generic full-bucket `/files` explorer (which stays): `/files` browses the whole bucket, `/documents` manages this app's receipts scoped to `raw-documents/` + `extracted/`. The Donut model is contained in `services/api/app/repo/donut_model.py` (external ML SDK in `repo/`, lazy imports), mirroring the `boto3`-only-in-`repo/` invariant.
 
 **Why this contract exists**
 - The UI kit, Files, and Upload pages are the reusable B2-backed scaffolding that makes this a starter kit — stripping them defeats the purpose. The dashboard is the only screen explicitly designed to be rewritten per app.

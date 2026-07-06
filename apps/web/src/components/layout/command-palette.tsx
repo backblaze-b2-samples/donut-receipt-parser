@@ -25,7 +25,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { getFiles } from "@/lib/api-client";
-import type { FileMetadata } from "@vibe-coding-starter-kit/shared";
+import type { FileMetadata } from "@donut-receipt-parser/shared";
 
 interface CommandPaletteProps {
   open: boolean;
