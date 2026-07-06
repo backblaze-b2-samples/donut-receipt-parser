@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Play } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ import { DocumentList } from "./document-list";
 import { useDocuments, useParseBatch } from "@/lib/queries";
 
 export function DocumentsView() {
+  const router = useRouter();
   const [addOpen, setAddOpen] = useState(false);
   const { data: docs } = useDocuments();
   const parseBatch = useParseBatch();
@@ -71,7 +73,12 @@ export function DocumentsView() {
                   Upload a receipt or invoice image to store it in Backblaze B2.
                 </DialogDescription>
               </DialogHeader>
-              <AddDocumentForm onCreated={() => setAddOpen(false)} />
+              <AddDocumentForm
+                onCreated={(docId) => {
+                  setAddOpen(false);
+                  router.push(`/documents/${docId}`);
+                }}
+              />
             </DialogContent>
           </Dialog>
         </div>

@@ -38,7 +38,11 @@ const schema = z.object({
 
 type Values = z.infer<typeof schema>;
 
-export function AddDocumentForm({ onCreated }: { onCreated?: () => void }) {
+export function AddDocumentForm({
+  onCreated,
+}: {
+  onCreated?: (docId: string) => void;
+}) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -68,7 +72,7 @@ export function AddDocumentForm({ onCreated }: { onCreated?: () => void }) {
       return;
     }
     try {
-      await create.mutateAsync({
+      const res = await create.mutateAsync({
         file,
         submitterId: values.submitter_id,
         documentType: values.document_type,
@@ -79,7 +83,7 @@ export function AddDocumentForm({ onCreated }: { onCreated?: () => void }) {
       setFile(null);
       setPreview(null);
       setProgress(0);
-      onCreated?.();
+      onCreated?.(res.doc_id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
     }

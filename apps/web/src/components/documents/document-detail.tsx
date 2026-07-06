@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Play, RefreshCw, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Play, RefreshCw, Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import {
@@ -114,6 +115,24 @@ export function DocumentDetail({ docId }: { docId: string }) {
   const parse = useParseDocument();
   const del = useDeleteDocument();
   const [correctOpen, setCorrectOpen] = useState(false);
+  // A single Donut generate() call gives no real progress signal, so we ease a
+  // time-estimated bar toward ~90% while pending — enough to show the >10s wait
+  // is advancing, not frozen. Cleared on resolve and on unmount (no leaks).
+  const [parseProgress, setParseProgress] = useState(0);
+
+  useEffect(() => {
+    if (!parse.isPending) return;
+    const start = Date.now();
+    const id = setInterval(() => {
+      // Ease toward ~90% over ~20s (asymptotic, never completes on its own).
+      const elapsed = (Date.now() - start) / 1000;
+      setParseProgress(Math.min(90, Math.round(90 * (1 - Math.exp(-elapsed / 7)))));
+    }, 300);
+    return () => {
+      clearInterval(id);
+      setParseProgress(0);
+    };
+  }, [parse.isPending]);
 
   const onParse = async () => {
     try {
@@ -169,7 +188,9 @@ export function DocumentDetail({ docId }: { docId: string }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" className="h-8" onClick={onParse} disabled={parse.isPending}>
-            {parsed ? (
+            {parse.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : parsed ? (
               <RefreshCw className="h-3.5 w-3.5" />
             ) : (
               <Play className="h-3.5 w-3.5" />
@@ -238,14 +259,29 @@ export function DocumentDetail({ docId }: { docId: string }) {
             <CardTitle className="card-title">Extracted data</CardTitle>
           </CardHeader>
           <CardContent className="p-5">
-            {!parsed || !doc.extracted ? (
+            {parse.isPending ? (
+              <div className="flex flex-col items-center justify-center gap-4 py-12 text-center">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">Parsing document…</p>
+                  <p className="max-w-sm text-sm text-muted-foreground">
+                    Running Donut on-device — this usually takes 10–30s.
+                  </p>
+                </div>
+                <Progress value={parseProgress} className="w-56" />
+              </div>
+            ) : !parsed || !doc.extracted ? (
               <EmptyState
                 icon={Play}
                 title="Not parsed yet"
                 description="Run Donut on this document to extract line items, subtotal, tax and total."
                 action={
                   <Button size="sm" onClick={onParse} disabled={parse.isPending}>
-                    <Play className="h-3.5 w-3.5" />
+                    {parse.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Play className="h-3.5 w-3.5" />
+                    )}
                     {parse.isPending ? "Parsing..." : "Parse now"}
                   </Button>
                 }
