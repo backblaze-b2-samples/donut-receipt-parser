@@ -25,6 +25,24 @@ loop where bulk write volume accumulates in B2 as it scales.
 - FastAPI backend with strict layered architecture and structural tests
 - Agent-optimized docs — your AI coding agent can read the repo and start contributing immediately
 
+## What it looks like
+
+**Dashboard** — pipeline metrics (documents ingested, parsed, parse coverage), a 7-day ingest-activity chart, and a recent-extractions table.
+
+![Dashboard with pipeline metrics, ingest chart, and recent extractions](docs/images/dashboard.png)
+
+**Documents** — the receipt/invoice library scoped to the app's `raw-documents/` and `extracted/` prefixes, with submitter, type, total, and parse status per row.
+
+![Documents library listing parsed receipts and invoices](docs/images/documents-library.png)
+
+**Document detail** — the original receipt image beside the Donut-extracted fields (merchant, date, totals) and line items, with re-parse and human-in-the-loop correction.
+
+![Document detail showing the receipt image next to extracted fields and line items](docs/images/document-detail.png)
+
+**Raw JSON** — the exact structured output the OCR-free Donut model emits for the document, straight from the model with no post-processing.
+
+![Raw JSON extraction output from the Donut model](docs/images/raw-json-extraction.png)
+
 ## Why B2
 
 Every artifact in the pipeline lives in one bucket over the S3-compatible API:
