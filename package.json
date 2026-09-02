@@ -18,6 +18,12 @@
   "devDependencies": {
     "concurrently": "^10.0.5"
   },
+  "pnpm": {
+    "overrides": {
+      "fast-uri": "3.1.6",
+      "qs": "6.16.0"
+    }
+  },
   "engines": {
     "node": ">=20",
     "pnpm": ">=9"
